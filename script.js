@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const isDark    = document.body.classList.contains('theme-dark');
         const WORD_MONO = "Consolas, 'Courier New', monospace";
-        const BORDER    = "1px solid #d0d0d0";
+        const OUTER_BORDER = "1.5pt solid #000000";   // outer table border only
         const GUTTER_BG = isDark ? "#1d2021" : "#f6f8fa";
         const GUTTER_FG = isDark ? "#6e7781" : "#8a929a";
         const CODE_BG   = isDark ? "#2d2d2d" : "#ffffff";
@@ -241,17 +241,21 @@ document.addEventListener('DOMContentLoaded', () => {
             // Convert Prism class-based colors → inline styles
             const inlinedCode = inlineTokenColors(codeCell.innerHTML, isDark);
 
+            // No border on td — only the outer table has a border
             rowsHtml += `
 <tr>
-  <td style="width:36pt;min-width:36pt;text-align:right;vertical-align:top;padding:1pt 6pt 1pt 4pt;background-color:${GUTTER_BG};color:${GUTTER_FG};font-family:Arial,sans-serif;font-size:10pt;border:${BORDER};white-space:nowrap;">${gutter.textContent}</td>
-  <td style="vertical-align:top;padding:1pt 8pt;background-color:${CODE_BG};color:${CODE_FG};font-family:${WORD_MONO};font-size:10pt;border:${BORDER};white-space:pre;">${inlinedCode}</td>
+  <td style="width:24pt;min-width:24pt;text-align:right;vertical-align:top;padding:0pt 4pt 0pt 2pt;background-color:${GUTTER_BG};color:${GUTTER_FG};font-family:Arial,sans-serif;font-size:8pt;white-space:nowrap;border:none;">${gutter.textContent}</td>
+  <td style="vertical-align:top;padding:0pt 4pt;background-color:${CODE_BG};color:${CODE_FG};font-family:${WORD_MONO};font-size:8pt;white-space:pre;border:none;">${inlinedCode}</td>
 </tr>`;
         });
 
         const wordHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="utf-8"><style>table{border-collapse:collapse;}td{mso-border-alt:solid #d0d0d0 .5pt;}</style></head>
+<head><meta charset="utf-8"><style>
+  table { border-collapse:collapse; }
+  td { border:none; mso-border-alt:none; }
+</style></head>
 <body>
-<table border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:${BORDER};">
+<table border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:${OUTER_BORDER};mso-border-alt:solid #000000 1.5pt;mso-border-insideh:none;mso-border-insidev:none;">
 ${rowsHtml}
 </table>
 </body></html>`;
