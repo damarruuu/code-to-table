@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Code-to-Table | GitHub Style Code Formatter</title>
+    <meta name="description" content="Convert raw code into a beautifully styled HTML table with line numbers, optimized for GitHub.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@500;600&display=swap" rel="stylesheet">
+    
+    <!-- Prism.js for Syntax Highlighting -->
+    <link id="prism-theme" rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+    
+    <link rel="stylesheet" href="styles.css?v=4">
+</head>
+<body class="theme-dark">
+    <header>
+        <div class="container">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"></path></svg>
+                <h1>Code<span>To</span>Table</h1>
+            </div>
+            <div class="header-actions">
+                <button id="theme-toggle" class="btn-icon" title="Toggle Theme">
+                    <span class="icon-sun">☀️</span>
+                    <span class="icon-moon">🌙</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="input-section">
+            <div class="section-header">
+                <h2>Input Code</h2>
+                <div class="controls">
+                    <select id="language-select">
+                        <option value="auto">Auto Detect</option>
+                        <option value="javascript">JavaScript</option>
+                        <option value="python">Python</option>
+                        <option value="java">Java</option>
+                        <option value="html">HTML</option>
+                        <option value="css">CSS</option>
+                        <option value="cpp">C++</option>
+                        <option value="go">Go</option>
+                        <option value="rust">Rust</option>
+                    </select>
+                    <div class="font-controls">
+                        <input type="number" id="font-size" value="14" min="10" max="24" title="Font Size">
+                        <select id="font-family">
+                            <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+                            <option value="Consolas, 'Courier New', monospace">Consolas</option>
+                            <option value="'Fira Code', monospace">Fira Code</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="textarea-wrapper" id="drop-zone">
+                <textarea id="code-input" placeholder="Paste your code here, or drag and drop a file..."></textarea>
+                <div class="drop-overlay">Drop file here</div>
+            </div>
+            
+            <div class="action-bar">
+                <button id="convert-btn" class="btn-primary">Convert to Table</button>
+                <button id="clear-btn" class="btn-secondary">Clear</button>
+            </div>
+        </section>
+
+        <section class="output-section hidden" id="result-section">
+            <div class="section-header">
+                <h2>Generated Table</h2>
+                <div class="action-buttons">
+                    <button id="copy-code-btn" class="btn-secondary">Copy Code</button>
+                    <button id="copy-word-btn" class="btn-secondary" title="Copy for Word/Rich Text">Copy for Word</button>
+                    <button id="copy-html-btn" class="btn-secondary">Copy HTML</button>
+                </div>
+            </div>
+            
+            <div class="table-container" id="table-output-wrapper">
+                <!-- Table will be injected here -->
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 CodeToTable Tool • Optimized for GitHub</p>
+        </div>
+    </footer>
+
+    <!-- Prism.js Core -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <!-- Prism.js Languages (Common ones) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-java.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-go.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-cpp.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-rust.min.js"></script>
+    
+    <script src="script.js?v=4"></script>
+</body>
+</html>
