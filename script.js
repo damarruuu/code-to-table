@@ -35,18 +35,14 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         dropZone.classList.add('dragging');
     });
-
     dropZone.addEventListener('dragleave', () => {
         dropZone.classList.remove('dragging');
     });
-
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.classList.remove('dragging');
         const file = e.dataTransfer.files[0];
-        if (file) {
-            readFile(file);
-        }
+        if (file) readFile(file);
     });
 
     function readFile(file) {
@@ -86,8 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (language && language !== 'auto') {
                     const grammar = Prism.languages[language];
                     if (grammar) {
-                        const highlighted = Prism.highlight(lineText || ' ', grammar, language);
-                        tdCode.innerHTML = highlighted;
+                        tdCode.innerHTML = Prism.highlight(lineText || ' ', grammar, language);
                     } else {
                         tdCode.textContent = lineText || ' ';
                     }
@@ -107,19 +102,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Action Handlers ---
     convertBtn.addEventListener('click', () => {
         const code = codeInput.value.trim();
-        if (!code) {
-            alert('Please paste some code first!');
-            return;
-        }
-
-        const lang = languageSelect.value;
-        const fontSize = fontSizeInput.value;
-        const fontFamily = fontFamilySelect.value;
+        if (!code) { alert('Please paste some code first!'); return; }
 
         tableOutputWrapper.innerHTML = '';
-        const table = TableRenderer.render(code, lang, fontSize, fontFamily);
+        const table = TableRenderer.render(
+            code,
+            languageSelect.value,
+            fontSizeInput.value,
+            fontFamilySelect.value
+        );
         tableOutputWrapper.appendChild(table);
-
         resultSection.classList.remove('hidden');
         resultSection.scrollIntoView({ behavior: 'smooth' });
     });
@@ -133,110 +125,70 @@ document.addEventListener('DOMContentLoaded', () => {
     copyCodeBtn.addEventListener('click', async () => {
         const table = tableOutputWrapper.querySelector('table');
         if (!table) return;
-
-        const codeCells = table.querySelectorAll('.code');
-        const codeText = Array.from(codeCells).map(cell => cell.textContent).join('\n');
-
+        const codeText = Array.from(table.querySelectorAll('.code'))
+            .map(c => c.textContent).join('\n');
         try {
             await navigator.clipboard.writeText(codeText);
             showCopyFeedback(copyCodeBtn, 'Copied Code!');
-        } catch (err) {
-            console.error('Failed to copy: ', err);
-        }
+        } catch (err) { console.error(err); }
     });
 
     // ─────────────────────────────────────────────────────────────────────────
-    // FIXED: Copy for Word
-    // Uses the modern Clipboard API with text/html MIME type so Word receives
-    // a proper rich-text table, not plain text.
-    // Inline styles are resolved BEFORE innerHTML is overwritten.
+    // Copy for Word — builds a REAL bordered table that Word renders as a grid
     // ─────────────────────────────────────────────────────────────────────────
     copyWordBtn.addEventListener('click', async () => {
         const table = tableOutputWrapper.querySelector('table');
         if (!table) return;
 
-        const wordFontFamily = "Consolas, 'Courier New', monospace";
-        const tableStyle = window.getComputedStyle(table);
-        const tableBg = tableStyle.backgroundColor;
+        const WORD_MONO = "Consolas, 'Courier New', monospace";
+        const BORDER    = "1px solid #d0d0d0";
+        const GUTTER_BG = "#f6f8fa";
+        const GUTTER_FG = "#6e7781";
+        const CODE_BG   = "#ffffff";
+        const CODE_FG   = "#24292e";
+        const FONT_SIZE = "10pt";
 
-        // Build HTML rows by walking the ORIGINAL DOM so getComputedStyle works.
-        // We collect everything as a string — no cloneNode needed.
-        let rowsHtml = '';
-
-        const rows = table.querySelectorAll('tr');
-        rows.forEach((row) => {
-            const gutter = row.querySelector('.gutter');
-            const codeCell = row.querySelector('.code');
-
-            const gStyle = window.getComputedStyle(gutter);
-            const cStyle = window.getComputedStyle(codeCell);
-
-            // Resolve span colors BEFORE building the code cell HTML string.
-            // Walk every span in the live DOM and bake its computed color into a style attribute.
-            const spans = codeCell.querySelectorAll('span');
-            spans.forEach((span) => {
-                const sColor = window.getComputedStyle(span).color;
-                const sWeight = window.getComputedStyle(span).fontWeight;
-                // Temporarily stamp the inline style so outerHTML captures it.
-                span.setAttribute('data-word-style', `color:${sColor};font-weight:${sWeight};font-family:${wordFontFamily};`);
-            });
-
-            // Grab the innerHTML with baked span styles.
-            // Replace data-word-style with style so Word sees them.
-            let codeCellHtml = codeCell.innerHTML.replace(/data-word-style="/g, 'style="');
-
-            // Clean up temp attributes from the live DOM.
-            spans.forEach((span) => span.removeAttribute('data-word-style'));
-
-            const gutterBg = gStyle.backgroundColor;
-            const gutterColor = gStyle.color;
-            const codeBg = cStyle.backgroundColor || tableBg;
-            const codeColor = cStyle.color;
-
-            rowsHtml += `
-            <tr>
-              <td style="
-                width:40pt;
-                text-align:right;
-                padding:2pt 6pt;
-                background-color:${gutterBg};
-                color:${gutterColor};
-                font-family:Arial,sans-serif;
-                font-size:10pt;
-                border-right:1px solid ${gutterColor};
-                vertical-align:top;
-                white-space:nowrap;
-                user-select:none;
-              ">${gutter.textContent}</td>
-              <td style="
-                padding:2pt 8pt;
-                background-color:${codeBg};
-                color:${codeColor};
-                font-family:${wordFontFamily};
-                font-size:10pt;
-                white-space:pre;
-                vertical-align:top;
-              "><span style="font-family:${wordFontFamily};color:${codeColor};">${codeCellHtml}</span></td>
-            </tr>`;
+        // Step 1: bake computed span colors into a temp attribute on the LIVE dom
+        // (getComputedStyle only works on elements that are in the document)
+        const allSpans = table.querySelectorAll('.code span');
+        allSpans.forEach(span => {
+            const cs = window.getComputedStyle(span);
+            span.setAttribute('data-ws',
+                `color:${cs.color};font-weight:${cs.fontWeight};font-style:${cs.fontStyle};font-family:${WORD_MONO};`
+            );
         });
 
-        // Wrap in a full table with inline styles Word can parse.
-        const wordHtml = `
-        <html>
-        <body>
-        <table style="
-          border-collapse:collapse;
-          width:100%;
-          background-color:${tableBg};
-          font-size:10pt;
-        " border="0" cellspacing="0" cellpadding="0">
-          ${rowsHtml}
-        </table>
-        </body>
-        </html>`;
+        // Step 2: build rows HTML — swap temp attr name to "style" in the string
+        let rowsHtml = '';
+        table.querySelectorAll('tr').forEach(row => {
+            const gutter   = row.querySelector('.gutter');
+            const codeCell = row.querySelector('.code');
 
+            const codeCellHtml = codeCell.innerHTML
+                .replace(/data-ws="/g, 'style="');
+
+            rowsHtml += `
+<tr>
+  <td style="width:36pt;min-width:36pt;text-align:right;vertical-align:top;padding:1pt 6pt 1pt 4pt;background-color:${GUTTER_BG};color:${GUTTER_FG};font-family:Arial,sans-serif;font-size:${FONT_SIZE};border:${BORDER};white-space:nowrap;">${gutter.textContent}</td>
+  <td style="vertical-align:top;padding:1pt 8pt;background-color:${CODE_BG};color:${CODE_FG};font-family:${WORD_MONO};font-size:${FONT_SIZE};border:${BORDER};white-space:pre;">${codeCellHtml}</td>
+</tr>`;
+        });
+
+        // Step 3: clean up temp attributes from live DOM
+        allSpans.forEach(span => span.removeAttribute('data-ws'));
+
+        // Step 4: wrap in a Word-compatible HTML document
+        // The mso- namespace hints and border="1" ensure Word draws the grid
+        const wordHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><style>table{border-collapse:collapse;}td{mso-border-alt:solid #d0d0d0 .5pt;}</style></head>
+<body>
+<table border="1" cellspacing="0" cellpadding="0" style="border-collapse:collapse;border:${BORDER};">
+${rowsHtml}
+</table>
+</body></html>`;
+
+        // Step 5: write as text/html to clipboard — Word reads this as a real table
         try {
-            // Modern Clipboard API: write text/html so Word gets a real table.
             await navigator.clipboard.write([
                 new ClipboardItem({
                     'text/html': new Blob([wordHtml], { type: 'text/html' }),
@@ -248,14 +200,13 @@ document.addEventListener('DOMContentLoaded', () => {
             ]);
             showCopyFeedback(copyWordBtn, 'Copied for Word!');
         } catch (err) {
-            // Fallback: try execCommand with a hidden div as a last resort.
-            console.warn('Clipboard API failed, trying execCommand fallback:', err);
+            // Fallback for file:// or older browsers
+            console.warn('Clipboard API blocked, trying execCommand fallback:', err);
             try {
                 const container = document.createElement('div');
                 container.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
                 container.innerHTML = wordHtml;
                 document.body.appendChild(container);
-
                 const range = document.createRange();
                 range.selectNodeContents(container);
                 const sel = window.getSelection();
@@ -265,9 +216,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 sel.removeAllRanges();
                 document.body.removeChild(container);
                 showCopyFeedback(copyWordBtn, 'Copied for Word!');
-            } catch (fallbackErr) {
-                console.error('Both copy methods failed:', fallbackErr);
-                alert('Copy failed. Your browser may not support rich-text clipboard.\nTry using Chrome or Edge.');
+            } catch (fb) {
+                console.error('Both copy methods failed:', fb);
+                alert('Copy failed. Serve the page over HTTPS, or use Chrome/Edge.');
             }
         }
     });
@@ -275,23 +226,18 @@ document.addEventListener('DOMContentLoaded', () => {
     copyHtmlBtn.addEventListener('click', async () => {
         const table = tableOutputWrapper.querySelector('table');
         if (!table) return;
-
-        const clonedTable = table.cloneNode(true);
-
         try {
-            await navigator.clipboard.writeText(clonedTable.outerHTML);
+            await navigator.clipboard.writeText(table.cloneNode(true).outerHTML);
             showCopyFeedback(copyHtmlBtn, 'Copied HTML!');
-        } catch (err) {
-            console.error('Failed to copy: ', err);
-        }
+        } catch (err) { console.error(err); }
     });
 
     function showCopyFeedback(btn, text) {
-        const originalText = btn.textContent;
+        const original = btn.textContent;
         btn.textContent = text;
         btn.classList.add('btn-success');
         setTimeout(() => {
-            btn.textContent = originalText;
+            btn.textContent = original;
             btn.classList.remove('btn-success');
         }, 2000);
     }
