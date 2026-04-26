@@ -31,13 +31,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- File Drag & Drop ---
-    dropZone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropZone.classList.add('dragging');
-    });
-    dropZone.addEventListener('dragleave', () => {
-        dropZone.classList.remove('dragging');
-    });
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragging'); });
+    dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('dragging'); });
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
         dropZone.classList.remove('dragging');
@@ -50,11 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onload = (e) => {
             codeInput.value = e.target.result;
             const ext = file.name.split('.').pop().toLowerCase();
-            const langMap = {
-                'js': 'javascript', 'py': 'python', 'java': 'java',
-                'html': 'html', 'css': 'css', 'cpp': 'cpp',
-                'go': 'go', 'rs': 'rust'
-            };
+            const langMap = { 'js':'javascript','py':'python','java':'java','html':'html','css':'css','cpp':'cpp','go':'go','rs':'rust' };
             if (langMap[ext]) languageSelect.value = langMap[ext];
         };
         reader.readAsText(file);
@@ -103,14 +94,8 @@ document.addEventListener('DOMContentLoaded', () => {
     convertBtn.addEventListener('click', () => {
         const code = codeInput.value.trim();
         if (!code) { alert('Please paste some code first!'); return; }
-
         tableOutputWrapper.innerHTML = '';
-        const table = TableRenderer.render(
-            code,
-            languageSelect.value,
-            fontSizeInput.value,
-            fontFamilySelect.value
-        );
+        const table = TableRenderer.render(code, languageSelect.value, fontSizeInput.value, fontFamilySelect.value);
         tableOutputWrapper.appendChild(table);
         resultSection.classList.remove('hidden');
         resultSection.scrollIntoView({ behavior: 'smooth' });
@@ -125,8 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     copyCodeBtn.addEventListener('click', async () => {
         const table = tableOutputWrapper.querySelector('table');
         if (!table) return;
-        const codeText = Array.from(table.querySelectorAll('.code'))
-            .map(c => c.textContent).join('\n');
+        const codeText = Array.from(table.querySelectorAll('.code')).map(c => c.textContent).join('\n');
         try {
             await navigator.clipboard.writeText(codeText);
             showCopyFeedback(copyCodeBtn, 'Copied Code!');
@@ -134,51 +118,136 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Copy for Word — builds a REAL bordered table that Word renders as a grid
+    // Prism token → inline color maps
+    // Dark theme = prism-tomorrow, Light theme = prism (default)
+    // These match the actual CSS colors from the Prism CDN stylesheets exactly.
+    // Word ignores CSS classes — every color MUST be inline style.
+    // ─────────────────────────────────────────────────────────────────────────
+    const PRISM_DARK_COLORS = {
+        'comment':        { color: '#999999', style: 'italic' },
+        'prolog':         { color: '#999999' },
+        'doctype':        { color: '#999999' },
+        'cdata':          { color: '#999999' },
+        'punctuation':    { color: '#cccccc' },
+        'property':       { color: '#f8c555' },
+        'tag':            { color: '#f8c555' },
+        'constant':       { color: '#f8c555' },
+        'symbol':         { color: '#f8c555' },
+        'deleted':        { color: '#f8c555' },
+        'boolean':        { color: '#f08d49' },
+        'number':         { color: '#f08d49' },
+        'selector':       { color: '#7ec699' },
+        'attr-name':      { color: '#7ec699' },
+        'string':         { color: '#7ec699' },
+        'char':           { color: '#7ec699' },
+        'builtin':        { color: '#7ec699' },
+        'inserted':       { color: '#7ec699' },
+        'operator':       { color: '#67cdcc' },
+        'entity':         { color: '#67cdcc' },
+        'url':            { color: '#67cdcc' },
+        'variable':       { color: '#e2777a' },
+        'atrule':         { color: '#cc99cd' },
+        'attr-value':     { color: '#cc99cd' },
+        'function':       { color: '#cc99cd' },
+        'keyword':        { color: '#cc99cd' },
+        'regex':          { color: '#de9b30' },
+        'important':      { color: '#de9b30', weight: 'bold' },
+    };
+
+    const PRISM_LIGHT_COLORS = {
+        'comment':        { color: '#708090', style: 'italic' },
+        'prolog':         { color: '#708090' },
+        'doctype':        { color: '#708090' },
+        'cdata':          { color: '#708090' },
+        'punctuation':    { color: '#999999' },
+        'property':       { color: '#905' },
+        'tag':            { color: '#905' },
+        'boolean':        { color: '#905' },
+        'number':         { color: '#905' },
+        'constant':       { color: '#905' },
+        'symbol':         { color: '#905' },
+        'deleted':        { color: '#905' },
+        'selector':       { color: '#690' },
+        'attr-name':      { color: '#690' },
+        'string':         { color: '#690' },
+        'char':           { color: '#690' },
+        'builtin':        { color: '#690' },
+        'inserted':       { color: '#690' },
+        'operator':       { color: '#9a6e3a' },
+        'entity':         { color: '#9a6e3a' },
+        'url':            { color: '#9a6e3a' },
+        'atrule':         { color: '#07a' },
+        'attr-value':     { color: '#07a' },
+        'keyword':        { color: '#07a' },
+        'function':       { color: '#DD4A68' },
+        'class-name':     { color: '#DD4A68' },
+        'regex':          { color: '#e90' },
+        'important':      { color: '#e90', weight: 'bold' },
+        'variable':       { color: '#e90' },
+    };
+
+    /**
+     * Takes a Prism-highlighted HTML string and converts all
+     * <span class="token xyz"> into <span style="color:..."> so that
+     * Word, Google Docs, and any rich-text editor can render the colors.
+     */
+    function inlineTokenColors(html, isDark) {
+        const colorMap = isDark ? PRISM_DARK_COLORS : PRISM_LIGHT_COLORS;
+        const defaultColor = isDark ? '#ccc' : '#000';
+
+        // Parse the HTML string into a temporary element
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+
+        tmp.querySelectorAll('span.token').forEach(span => {
+            // A span can have multiple token classes e.g. "token keyword operator"
+            const classes = Array.from(span.classList).filter(c => c !== 'token');
+            let resolved = null;
+            for (const cls of classes) {
+                if (colorMap[cls]) { resolved = colorMap[cls]; break; }
+            }
+
+            const color  = resolved ? resolved.color  : defaultColor;
+            const weight = resolved && resolved.weight ? resolved.weight : 'normal';
+            const fstyle = resolved && resolved.style  ? resolved.style  : 'normal';
+
+            span.removeAttribute('class');
+            span.style.cssText = `color:${color};font-weight:${weight};font-style:${fstyle};font-family:Consolas,'Courier New',monospace;`;
+        });
+
+        return tmp.innerHTML;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Copy for Word — real bordered table with fully inlined syntax colors
     // ─────────────────────────────────────────────────────────────────────────
     copyWordBtn.addEventListener('click', async () => {
         const table = tableOutputWrapper.querySelector('table');
         if (!table) return;
 
+        const isDark    = document.body.classList.contains('theme-dark');
         const WORD_MONO = "Consolas, 'Courier New', monospace";
         const BORDER    = "1px solid #d0d0d0";
-        const GUTTER_BG = "#f6f8fa";
-        const GUTTER_FG = "#6e7781";
-        const CODE_BG   = "#ffffff";
-        const CODE_FG   = "#24292e";
-        const FONT_SIZE = "10pt";
+        const GUTTER_BG = isDark ? "#1d2021" : "#f6f8fa";
+        const GUTTER_FG = isDark ? "#6e7781" : "#8a929a";
+        const CODE_BG   = isDark ? "#2d2d2d" : "#ffffff";
+        const CODE_FG   = isDark ? "#cccccc" : "#24292e";
 
-        // Step 1: bake computed span colors into a temp attribute on the LIVE dom
-        // (getComputedStyle only works on elements that are in the document)
-        const allSpans = table.querySelectorAll('.code span');
-        allSpans.forEach(span => {
-            const cs = window.getComputedStyle(span);
-            span.setAttribute('data-ws',
-                `color:${cs.color};font-weight:${cs.fontWeight};font-style:${cs.fontStyle};font-family:${WORD_MONO};`
-            );
-        });
-
-        // Step 2: build rows HTML — swap temp attr name to "style" in the string
         let rowsHtml = '';
         table.querySelectorAll('tr').forEach(row => {
             const gutter   = row.querySelector('.gutter');
             const codeCell = row.querySelector('.code');
 
-            const codeCellHtml = codeCell.innerHTML
-                .replace(/data-ws="/g, 'style="');
+            // Convert Prism class-based colors → inline styles
+            const inlinedCode = inlineTokenColors(codeCell.innerHTML, isDark);
 
             rowsHtml += `
 <tr>
-  <td style="width:36pt;min-width:36pt;text-align:right;vertical-align:top;padding:1pt 6pt 1pt 4pt;background-color:${GUTTER_BG};color:${GUTTER_FG};font-family:Arial,sans-serif;font-size:${FONT_SIZE};border:${BORDER};white-space:nowrap;">${gutter.textContent}</td>
-  <td style="vertical-align:top;padding:1pt 8pt;background-color:${CODE_BG};color:${CODE_FG};font-family:${WORD_MONO};font-size:${FONT_SIZE};border:${BORDER};white-space:pre;">${codeCellHtml}</td>
+  <td style="width:36pt;min-width:36pt;text-align:right;vertical-align:top;padding:1pt 6pt 1pt 4pt;background-color:${GUTTER_BG};color:${GUTTER_FG};font-family:Arial,sans-serif;font-size:10pt;border:${BORDER};white-space:nowrap;">${gutter.textContent}</td>
+  <td style="vertical-align:top;padding:1pt 8pt;background-color:${CODE_BG};color:${CODE_FG};font-family:${WORD_MONO};font-size:10pt;border:${BORDER};white-space:pre;">${inlinedCode}</td>
 </tr>`;
         });
 
-        // Step 3: clean up temp attributes from live DOM
-        allSpans.forEach(span => span.removeAttribute('data-ws'));
-
-        // Step 4: wrap in a Word-compatible HTML document
-        // The mso- namespace hints and border="1" ensure Word draws the grid
         const wordHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
 <head><meta charset="utf-8"><style>table{border-collapse:collapse;}td{mso-border-alt:solid #d0d0d0 .5pt;}</style></head>
 <body>
@@ -187,21 +256,18 @@ ${rowsHtml}
 </table>
 </body></html>`;
 
-        // Step 5: write as text/html to clipboard — Word reads this as a real table
+        const plainText = Array.from(table.querySelectorAll('.code')).map(c => c.textContent).join('\n');
+
         try {
             await navigator.clipboard.write([
                 new ClipboardItem({
-                    'text/html': new Blob([wordHtml], { type: 'text/html' }),
-                    'text/plain': new Blob(
-                        [Array.from(table.querySelectorAll('.code')).map(c => c.textContent).join('\n')],
-                        { type: 'text/plain' }
-                    )
+                    'text/html':  new Blob([wordHtml],  { type: 'text/html' }),
+                    'text/plain': new Blob([plainText], { type: 'text/plain' })
                 })
             ]);
             showCopyFeedback(copyWordBtn, 'Copied for Word!');
         } catch (err) {
-            // Fallback for file:// or older browsers
-            console.warn('Clipboard API blocked, trying execCommand fallback:', err);
+            console.warn('Clipboard API failed:', err);
             try {
                 const container = document.createElement('div');
                 container.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
@@ -217,8 +283,8 @@ ${rowsHtml}
                 document.body.removeChild(container);
                 showCopyFeedback(copyWordBtn, 'Copied for Word!');
             } catch (fb) {
-                console.error('Both copy methods failed:', fb);
-                alert('Copy failed. Serve the page over HTTPS, or use Chrome/Edge.');
+                console.error('Both methods failed:', fb);
+                alert('Copy failed. Try Chrome or Edge.');
             }
         }
     });
@@ -236,9 +302,6 @@ ${rowsHtml}
         const original = btn.textContent;
         btn.textContent = text;
         btn.classList.add('btn-success');
-        setTimeout(() => {
-            btn.textContent = original;
-            btn.classList.remove('btn-success');
-        }, 2000);
+        setTimeout(() => { btn.textContent = original; btn.classList.remove('btn-success'); }, 2000);
     }
 });
